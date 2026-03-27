@@ -3,11 +3,12 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { processGhlConversationWebhook } from './src/ghl-webhook.js';
-import { addContactTag, removeContactTag, sendMessage, triggerWorkflow } from './src/ghl-api.js';
+import { addContactTag, removeContactTag, sendMessage, sendMessageWithAttachments, triggerWorkflow } from './src/ghl-api.js';
 import { generateReply } from './src/ai-engine.js';
 import { serveVoiceNote } from './src/voice-notes.js';
 import { cloneSnapshot, generateSnapshot } from './src/snapshot.js';
 import { verifyGhlWebhookSignature } from './src/security.js';
+import { appendEvent, readStore, updateMetrics } from './src/store.js';
 
 dotenv.config();
 
@@ -17,10 +18,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const recentEvents = [];
-const adminState = {
-  leads: 0,
-  followUpsTriggered: 0,
-};
 
 app.use('/webhooks/ghl/conversation', express.raw({ type: 'application/json', limit: '2mb' }));
 app.use(express.json({ limit: '2mb' }));
@@ -71,17 +68,20 @@ app.post('/webhooks/ghl/conversation', (req, res) => {
   setImmediate(async () => {
     try {
       const event = await processGhlConversationWebhook(payload, recentEvents);
-      adminState.leads += 1;
-      if (['objection', 'purchase_intent'].includes(event.ai.intent)) {
-        adminState.followUpsTriggered += 1;
-      }
+      await appendEvent(event);
+      await updateMetrics((metrics) => ({
+        leads: (metrics.leads || 0) + 1,
+        followUpsTriggered: (metrics.followUpsTriggered || 0) + (['objection', 'purchase_intent'].includes(event.ai.intent) ? 1 : 0),
+      }));
     } catch (error) {
       console.error('Failed to process GHL webhook:', error.response?.data || error.message);
-      recentEvents.unshift({
+      const errorEvent = {
         receivedAt: new Date().toISOString(),
         type: 'error',
         error: error.response?.data || error.message,
-      });
+      };
+      recentEvents.unshift(errorEvent);
+      await appendEvent(errorEvent);
     }
   });
 });
@@ -110,7 +110,17 @@ app.post('/snapshot/clone', (req, res) => {
 
 app.post('/conversations/ai-reply', async (req, res) => {
   try {
-    const { leadProfile = {}, message = '', brandConfig = {}, locationId, conversationId, channel = 'sms', send = false } = req.body || {};
+    const {
+      leadProfile = {},
+      message = '',
+      brandConfig = {},
+      locationId,
+      conversationId,
+      channel = 'sms',
+      attachments = [],
+      send = false,
+    } = req.body || {};
+
     if (!message) return res.status(400).json({ error: 'message is required' });
 
     const mergedBrandConfig = { ...defaultBrandConfig(locationId), ...brandConfig };
@@ -118,17 +128,22 @@ app.post('/conversations/ai-reply', async (req, res) => {
 
     let delivery = null;
     if (send && conversationId) {
-      delivery = await sendMessage(locationId || process.env.GHL_LOCATION_ID, conversationId, aiResult.reply, channel);
+      delivery = attachments.length
+        ? await sendMessageWithAttachments(locationId || process.env.GHL_LOCATION_ID, conversationId, aiResult.reply, channel, attachments)
+        : await sendMessage(locationId || process.env.GHL_LOCATION_ID, conversationId, aiResult.reply, channel);
     }
 
-    recentEvents.unshift({
+    const aiEvent = {
       receivedAt: new Date().toISOString(),
       type: 'ai-reply',
       leadProfile,
       message,
+      attachments,
       ai: aiResult,
-    });
+    };
+    recentEvents.unshift(aiEvent);
     if (recentEvents.length > 50) recentEvents.pop();
+    await appendEvent(aiEvent);
 
     res.json({ ...aiResult, delivery });
   } catch (error) {
@@ -156,18 +171,23 @@ app.post('/workflows/trigger', async (req, res) => {
     const { locationId, contactId, workflowId } = req.body || {};
     if (!contactId || !workflowId) return res.status(400).json({ error: 'contactId and workflowId are required' });
     const result = await triggerWorkflow(locationId, contactId, workflowId);
-    adminState.followUpsTriggered += 1;
+    await updateMetrics((metrics) => ({
+      leads: metrics.leads || 0,
+      followUpsTriggered: (metrics.followUpsTriggered || 0) + 1,
+    }));
+    await appendEvent({ receivedAt: new Date().toISOString(), type: 'workflow-trigger', locationId, contactId, workflowId, result });
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.response?.data || error.message });
   }
 });
 
-app.get('/admin/overview', (_req, res) => {
+app.get('/admin/overview', async (_req, res) => {
+  const store = await readStore();
   res.json({
-    leads: adminState.leads,
-    followUpsTriggered: adminState.followUpsTriggered,
-    recentEvents: recentEvents.slice(0, 20),
+    leads: store.metrics?.leads || 0,
+    followUpsTriggered: store.metrics?.followUpsTriggered || 0,
+    recentEvents: store.events?.slice(0, 20) || recentEvents.slice(0, 20),
   });
 });
 

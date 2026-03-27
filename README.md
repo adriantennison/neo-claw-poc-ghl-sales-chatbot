@@ -280,6 +280,44 @@ This closes the gap on voice-note handling instead of only gesturing at it.
 
 ## QA / demo assets
 
+## Multimedia messaging
+
+The POC now supports attachment-aware outbound replies.
+
+- inbound webhook attachments are preserved
+- audio attachments can be transcribed and interpreted
+- outbound replies can include attachments through `sendMessageWithAttachments(...)`
+
+This makes the messaging layer closer to a real GHL Conversations workflow instead of plain text only.
+
+---
+
+## Persistent admin overview
+
+`/admin/overview` now reads from a lightweight JSON-backed event store:
+
+- recent events persisted to `data/events.json`
+- lead and follow-up counts persist across restarts
+
+---
+
+## Signed webhook generator
+
+For QA, generate a signed sample payload with:
+
+```bash
+node scripts/generate-signed-webhook.js
+```
+
+This prints:
+
+- a sample payload
+- a matching HMAC signature
+- a ready-to-run curl command
+
+---
+
+
 Included in the repo:
 
 - `postman.collection.json` — ready-made API collection

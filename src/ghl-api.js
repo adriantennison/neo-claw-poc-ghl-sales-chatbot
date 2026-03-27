@@ -107,3 +107,29 @@ export async function sendMessage(locationId, conversationId, body, channel = 's
 
   return response.data;
 }
+
+export async function sendMessageWithAttachments(locationId, conversationId, body, channel = 'sms', attachments = []) {
+  const cfg = getConfig({ locationId });
+  if (isDemoMode(cfg.apiKey)) {
+    return simulate('sendMessageWithAttachments', {
+      locationId: cfg.locationId,
+      conversationId,
+      body,
+      channel,
+      attachments,
+    });
+  }
+
+  const response = await axios.post(
+    `${GHL_BASE_URL}/conversations/messages`,
+    {
+      type: channel,
+      conversationId,
+      message: body,
+      attachments,
+    },
+    { headers: createHeaders(cfg.apiKey, cfg.locationId) }
+  );
+
+  return response.data;
+}

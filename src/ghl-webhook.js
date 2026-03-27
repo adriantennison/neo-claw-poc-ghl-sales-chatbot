@@ -1,5 +1,5 @@
 import { generateReply } from './ai-engine.js';
-import { addContactTag, sendMessage, triggerWorkflow } from './ghl-api.js';
+import { addContactTag, sendMessage, sendMessageWithAttachments, triggerWorkflow } from './ghl-api.js';
 import { extractAudioAttachment, transcribeAudioFromAttachment } from './transcription.js';
 
 function parseWorkflowIds() {
@@ -65,7 +65,18 @@ export async function processGhlConversationWebhook(payload, eventStore = []) {
     await addContactTag(locationId, contactId, 'stop-sales');
   }
 
-  await sendMessage(locationId, conversationId, aiResult.reply, channel);
+  const outboundAttachments = attachments
+    .map((attachment) => ({
+      url: attachment.url || attachment.link,
+      type: attachment.type || attachment.mimeType || 'file',
+    }))
+    .filter((item) => item.url);
+
+  if (outboundAttachments.length) {
+    await sendMessageWithAttachments(locationId, conversationId, aiResult.reply, channel, outboundAttachments);
+  } else {
+    await sendMessage(locationId, conversationId, aiResult.reply, channel);
+  }
 
   const event = {
     receivedAt: new Date().toISOString(),
