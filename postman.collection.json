@@ -1,0 +1,90 @@
+{
+  "info": {
+    "name": "Neo Claw GHL Sales Chatbot POC",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "QA/demo collection for the GoHighLevel-integrated sales chatbot POC."
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "AI Reply",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"leadProfile\": {\n    \"contactId\": \"contact_123\",\n    \"name\": \"Jane Prospect\"\n  },\n  \"message\": \"How much does this cost?\",\n  \"brandConfig\": {\n    \"brandName\": \"Neo Claw\",\n    \"offer\": \"AI-assisted sales qualification\",\n    \"joinLink\": \"https://example.com/book\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/conversations/ai-reply",
+          "host": ["{{baseUrl}}"],
+          "path": ["conversations", "ai-reply"]
+        }
+      }
+    },
+    {
+      "name": "GHL Conversation Webhook",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"InboundMessage\",\n  \"contactId\": \"contact_123\",\n  \"locationId\": \"location_abc\",\n  \"conversationId\": \"conv_456\",\n  \"messageBody\": \"I am interested but not sure if this is right for me\",\n  \"channel\": \"sms\",\n  \"attachments\": []\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/webhooks/ghl/conversation",
+          "host": ["{{baseUrl}}"],
+          "path": ["webhooks", "ghl", "conversation"]
+        }
+      }
+    },
+    {
+      "name": "Generate Voice Note",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Thanks for reaching out. Here is the fastest next step.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/voice-notes/generate",
+          "host": ["{{baseUrl}}"],
+          "path": ["voice-notes", "generate"]
+        }
+      }
+    },
+    {
+      "name": "Generate Snapshot",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"brandName\": \"Neo Claw\",\n  \"offer\": \"AI-assisted lead qualification\",\n  \"joinLink\": \"https://example.com/book\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/snapshot/generate",
+          "host": ["{{baseUrl}}"],
+          "path": ["snapshot", "generate"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    }
+  ]
+}

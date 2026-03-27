@@ -1,5 +1,6 @@
 import { generateReply } from './ai-engine.js';
 import { addContactTag, sendMessage, triggerWorkflow } from './ghl-api.js';
+import { extractAudioAttachment, transcribeAudioFromAttachment } from './transcription.js';
 
 function parseWorkflowIds() {
   try {
@@ -33,15 +34,20 @@ export async function processGhlConversationWebhook(payload, eventStore = []) {
   } = payload || {};
 
   const brandConfig = buildBrandConfig(locationId);
+  const audioAttachment = extractAudioAttachment(attachments);
+  const transcription = audioAttachment ? await transcribeAudioFromAttachment(audioAttachment) : null;
+  const normalizedMessage = messageBody || transcription?.transcript || '';
+
   const leadProfile = {
     contactId,
     locationId,
     conversationId,
     channel,
     attachments,
+    transcription,
   };
 
-  const aiResult = await generateReply(leadProfile, messageBody, brandConfig);
+  const aiResult = await generateReply(leadProfile, normalizedMessage, brandConfig);
 
   for (const tag of aiResult.suggestedTags || []) {
     await addContactTag(locationId, contactId, tag);
@@ -67,9 +73,10 @@ export async function processGhlConversationWebhook(payload, eventStore = []) {
     contactId,
     locationId,
     conversationId,
-    messageBody,
+    messageBody: normalizedMessage,
     channel,
     attachments,
+    transcription,
     ai: aiResult,
   };
 

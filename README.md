@@ -253,6 +253,40 @@ This is the duplication layer that turns one strong POC into a repeatable deploy
 
 ---
 
+
+## Webhook security
+
+The conversation webhook now supports **HMAC-SHA256 signature verification** using `GHL_WEBHOOK_SECRET`.
+
+- Header support: `x-ghl-signature` or `x-wh-signature`
+- Invalid signatures return `401`
+- If no secret is configured, the POC stays in demo-friendly mode
+
+---
+
+## Inbound audio and transcription
+
+If a webhook includes an audio attachment, the handler will:
+
+1. detect the voice-note/media attachment
+2. download it temporarily
+3. transcribe it with OpenAI when configured
+4. fall back to a mock transcript in demo mode
+5. feed the transcript into the same sales AI flow
+
+This closes the gap on voice-note handling instead of only gesturing at it.
+
+---
+
+## QA / demo assets
+
+Included in the repo:
+
+- `postman.collection.json` — ready-made API collection
+- `docs/curl-examples.sh` — curl test pack for local QA
+
+---
+
 ## API endpoints
 
 ### Core endpoints

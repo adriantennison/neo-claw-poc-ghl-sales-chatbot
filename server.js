@@ -7,6 +7,7 @@ import { addContactTag, removeContactTag, sendMessage, triggerWorkflow } from '.
 import { generateReply } from './src/ai-engine.js';
 import { serveVoiceNote } from './src/voice-notes.js';
 import { cloneSnapshot, generateSnapshot } from './src/snapshot.js';
+import { verifyGhlWebhookSignature } from './src/security.js';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ const adminState = {
   followUpsTriggered: 0,
 };
 
+app.use('/webhooks/ghl/conversation', express.raw({ type: 'application/json', limit: '2mb' }));
 app.use(express.json({ limit: '2mb' }));
 app.use('/voice-notes', express.static(path.join(__dirname, 'public', 'voice-notes')));
 
@@ -49,11 +51,26 @@ app.get('/health', (_req, res) => {
 });
 
 app.post('/webhooks/ghl/conversation', (req, res) => {
+  let payload;
+  try {
+    const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
+    const signature = req.get('x-ghl-signature') || req.get('x-wh-signature') || '';
+    const verification = verifyGhlWebhookSignature(rawBody, signature);
+
+    if (verification.enabled && !verification.valid) {
+      return res.status(401).json({ error: 'Invalid webhook signature', detail: verification.reason });
+    }
+
+    payload = JSON.parse(rawBody.toString('utf8'));
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid JSON payload', detail: error.message });
+  }
+
   res.status(200).json({ received: true, async: true });
 
   setImmediate(async () => {
     try {
-      const event = await processGhlConversationWebhook(req.body, recentEvents);
+      const event = await processGhlConversationWebhook(payload, recentEvents);
       adminState.leads += 1;
       if (['objection', 'purchase_intent'].includes(event.ai.intent)) {
         adminState.followUpsTriggered += 1;
