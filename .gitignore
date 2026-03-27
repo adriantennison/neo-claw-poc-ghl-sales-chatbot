@@ -1,0 +1,4 @@
+node_modules/
+.env
+public/voice-notes/*
+!public/voice-notes/.gitkeep

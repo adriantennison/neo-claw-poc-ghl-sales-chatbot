@@ -1,0 +1,17 @@
+{
+  "name": "neo-claw-poc-ghl-sales-chatbot",
+  "version": "1.0.0",
+  "description": "GoHighLevel sales chatbot POC with conversation webhooks, tagging, workflows, snapshot cloning, and voice notes.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "axios": "^1.8.2",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "openai": "^4.86.1"
+  }
+}
